@@ -15,10 +15,24 @@ Rapid Exploration and Cache-Enabled Neurosymbolic Vision-Language Planning for Z
 cd VLN-Zero
 ```
 
-3. Follow the VLN-CE installation guide
+2. Make changes to the `habitat-lab` code
+
+In `habitat-lab/habitat/utils/visualizations/maps.py`, change lines 425-426 to the following:
+
+```python
+    limit = topdown_map_info["limits"]
+    # Crop the map to show only the agent and goal +- some buffer
+    top_down_map = top_down_map[limit[0]:limit[1], limit[2]:limit[3]]
+```
+
+Also, in `habitat-lab/habitat_baselines/rl/requirements.txt`, remove lines 3-4 (the `tensorflow==1.13.1` requirement is not needed).
+
+3. Follow the VLN-CE installation guide.
+
 Install both Habitat-Lab and VLN-CE following the setup steps provided [here](https://github.com/jacobkrantz/VLN-CE).
 
 4. Download data
+
 Following the steps from the VLN-CE project, download the MP3D, R2R, and RxR datasets. The final structure should look like something like this.
 
 ```
