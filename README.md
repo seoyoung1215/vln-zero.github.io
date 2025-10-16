@@ -78,6 +78,10 @@ These scripts were taken from [NaVid-VLN-CE](https://github.com/jzhzhang/NaVid-V
 ## Citation
 Please cite with
 ```
-
-
+@misc{anonymous2025vlnzerorapidexplorationcacheenabled,
+      title={VLN-Zero: Rapid Exploration and Cache-Enabled Neurosymbolic Vision-Language Planning for Zero-Shot Transfer in Robot Navigation}, 
+      author={Anonymous},
+      year={2025},
+      url={https://vln-zero.github.io/},
+}
 ```
