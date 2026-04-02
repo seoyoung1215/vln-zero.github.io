@@ -1,0 +1,9 @@
+# TEST: ANSR with .glb under SCENES_DIR and matching .navmesh files under NAVMESH_DIR
+# (see ansr_gibson_split_navmesh_v1_task.yaml). Use with SplitNavmeshEnv in my_agent.
+
+BASE_TASK_CONFIG_PATH: VLN_CE/habitat_extensions/config/ansr_gibson_split_navmesh_v1_task.yaml
+EVAL:
+  IDENTIFICATION: ansr_gibson_split_navmesh
+  SPLIT: all
+  EARLY_STOP_ROTATION: 10
+  EARLY_STOP_STEPS: 100
