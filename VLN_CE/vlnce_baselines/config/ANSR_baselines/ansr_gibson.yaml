@@ -1,0 +1,13 @@
+# Eval config for ANSR with Gibson scene assets under VLN_CE/data/scene_datasets/gibson/.
+# Usage (from repo root):
+#   python run.py --exp-config VLN_CE/vlnce_baselines/config/ANSR_baselines/ansr_gibson.yaml ...
+#
+# Mesh (.glb) and navmesh (.navmesh) paths: episodes resolve scene_id under
+# TASK_CONFIG.DATASET.SCENES_DIR; see ansr_gibson_v1_task.yaml for layout notes.
+
+BASE_TASK_CONFIG_PATH: VLN_CE/habitat_extensions/config/ansr_gibson_v1_task.yaml
+EVAL:
+  IDENTIFICATION: ansr_gibson
+  SPLIT: all
+  EARLY_STOP_ROTATION: 10
+  EARLY_STOP_STEPS: 100

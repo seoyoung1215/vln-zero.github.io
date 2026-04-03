@@ -1,10 +1,19 @@
 #!/bin/bash
-import run
+# import run
 CHUNKS=1
 
+# # ANSR
+# CONFIG_PATH="VLN_CE/vlnce_baselines/config/ANSR_baselines/ansr.yaml"
+# SAVE_PATH="runs/gpt-4.1-ansr"
+
+# ANSR Gibson
+CONFIG_PATH="VLN_CE/vlnce_baselines/config/ANSR_baselines/ansr_gibson.yaml"
+SAVE_PATH="runs/gpt-4.1-ansr-gibson"
+
+
 # R2R
-CONFIG_PATH="VLN_CE/vlnce_baselines/config/r2r_baselines/zero_r2r.yaml"
-SAVE_PATH="runs/gpt-4.1-r2r"
+# CONFIG_PATH="VLN_CE/vlnce_baselines/config/r2r_baselines/zero_r2r.yaml"
+# SAVE_PATH="runs/gpt-4.1-r2r"
 
 
 # #RxR

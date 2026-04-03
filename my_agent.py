@@ -4,7 +4,7 @@
 
 import json
 import numpy as np
-from habitat import Env
+from VLN_CE.habitat_extensions.split_navmesh_env import SplitNavmeshEnv
 from habitat.core.agent import Agent
 from tqdm import trange
 import os
@@ -26,6 +26,16 @@ import math
 import time
 import statistics
 
+
+def _cached_prompt_tokens(usage):
+    details = getattr(usage, "prompt_tokens_details", None)
+    if details is None:
+        return 0
+    if isinstance(details, dict):
+        return details.get("cached_tokens") or 0
+    return getattr(details, "cached_tokens", None) or 0
+
+
 def openai_api_calculate_cost(usage):
     model_pricing = {
         'prompt': 0.002,
@@ -34,7 +44,7 @@ def openai_api_calculate_cost(usage):
     }
 
     prompt_cost = usage.prompt_tokens * model_pricing['prompt'] / 1000
-    cached_cost = usage.prompt_tokens_details['cached_tokens'] * model_pricing['cached'] / 1000
+    cached_cost = _cached_prompt_tokens(usage) * model_pricing['cached'] / 1000
     completion_cost = usage.completion_tokens * model_pricing['completion'] / 1000
 
     total_cost = prompt_cost + completion_cost + cached_cost
@@ -128,7 +138,18 @@ def evaluate_agent(config, split_id, dataset, result_path) -> None:
     enable_use_of_cache = False
     enable_adding_to_cache = False # should be false if we do not have enable_use_of_cache
 
-    env = Env(config.TASK_CONFIG, dataset)
+    if dataset.episodes:
+        mesh_path = dataset.episodes[0].scene_id
+        if not os.path.isfile(mesh_path):
+            raise FileNotFoundError(
+                "Scene mesh file not found:\n"
+                f"  {mesh_path}\n"
+                "If the path contains 'gibson/gibson/', set DATASET.SCENES_DIR to the "
+                "scene_datasets parent (ANSR episode scene_ids already start with "
+                "`gibson/`). Missing meshes can also crash habitat-sim with a segfault."
+            )
+
+    env = SplitNavmeshEnv(config.TASK_CONFIG, dataset)
     agent = MyGPTAgent(result_path)
     num_episodes = len(env.episodes) # You can customize this to a low number (e.g. 5) to run on a small subset of examples.
     EARLY_STOP_ROTATION = config.EVAL.EARLY_STOP_ROTATION
@@ -140,7 +161,7 @@ def evaluate_agent(config, split_id, dataset, result_path) -> None:
 
     # It is HIGHLY RECOMMENDED to create a backup or custom file for your scene graphs
     # and change the path here to that instead.
-    SCENE_GRAPHS_PATH = "VLN_CE/data/connectivity_graphs.pkl"
+    # SCENE_GRAPHS_PATH = "VLN_CE/data/connectivity_graphs.pkl"
 
     for _ in trange(
         num_episodes, desc=config.EVAL.IDENTIFICATION + "-{}".format(split_id)
@@ -157,10 +178,10 @@ def evaluate_agent(config, split_id, dataset, result_path) -> None:
 
         print(f"[{episode_id} LOG] {scene_id}/{episode_id} reached")
 
-        with open(SCENE_GRAPHS_PATH, 'rb') as f:
-            scene_graphs = pickle.load(f)
+        # with open(SCENE_GRAPHS_PATH, 'rb') as f:
+        #     scene_graphs = pickle.load(f)
 
-        curr_sg = scene_graphs[scene_id]
+        # curr_sg = scene_graphs[scene_id]
 
         cached_actions_LOG = []
         who_acted_LOG = []
@@ -171,7 +192,7 @@ def evaluate_agent(config, split_id, dataset, result_path) -> None:
         last_dtg = 999
 
         goal_pos = env.current_episode.goals[0].position
-        goal_waypoint = find_nearest_waypoint_to(goal_pos, curr_sg)
+        # goal_waypoint = find_nearest_waypoint_to(goal_pos, curr_sg)
 
         old_waypoint = None
         old_initial_orientation = None
@@ -218,125 +239,125 @@ def evaluate_agent(config, split_id, dataset, result_path) -> None:
             else:
                 continuse_rotation_count += 1
 
-            if (enable_use_of_cache):
-                waypoint = find_nearest_waypoint_to(curr_pos, curr_sg, thresh=0.25)
-                if (waypoint != None):
-                    # try to cache the just finished path from previous point to this waypoint
-                    if (enable_adding_to_cache):
-                        if (old_waypoint) and (old_waypoint != waypoint):
-                            if curr_sg.has_edge(old_waypoint, waypoint):
-                                try:
-                                    if (len(curr_sg[old_waypoint][waypoint]['cache_info']['cached_actions']) > cached_temp_path):
-                                        # we have found a shorter path than our current cached path so we will replace it
-                                        curr_sg[old_waypoint][waypoint]['cache_info'] = {'start': old_waypoint, 'start_ori': old_initial_orientation, 'cached_actions': cached_temp_path}
-                                        cached_this_iter = True
-                                except: # no cache info currently
-                                    curr_sg[old_waypoint][waypoint]['cache_info'] = {'start': old_waypoint, 'start_ori': old_initial_orientation, 'cached_actions': cached_temp_path}
-                                    cached_this_iter = True
-                            else:
-                                curr_sg.add_edge(old_waypoint, waypoint, cache_info={'start': old_waypoint, 'start_ori': old_initial_orientation, 'cached_actions': cached_temp_path})
-                                cached_this_iter = True
+            # if (enable_use_of_cache):
+            #     waypoint = find_nearest_waypoint_to(curr_pos, curr_sg, thresh=0.25)
+            #     if (waypoint != None):
+            #         # try to cache the just finished path from previous point to this waypoint
+            #         if (enable_adding_to_cache):
+            #             if (old_waypoint) and (old_waypoint != waypoint):
+            #                 if curr_sg.has_edge(old_waypoint, waypoint):
+            #                     try:
+            #                         if (len(curr_sg[old_waypoint][waypoint]['cache_info']['cached_actions']) > cached_temp_path):
+            #                             # we have found a shorter path than our current cached path so we will replace it
+            #                             curr_sg[old_waypoint][waypoint]['cache_info'] = {'start': old_waypoint, 'start_ori': old_initial_orientation, 'cached_actions': cached_temp_path}
+            #                             cached_this_iter = True
+            #                     except: # no cache info currently
+            #                         curr_sg[old_waypoint][waypoint]['cache_info'] = {'start': old_waypoint, 'start_ori': old_initial_orientation, 'cached_actions': cached_temp_path}
+            #                         cached_this_iter = True
+            #                 else:
+            #                     curr_sg.add_edge(old_waypoint, waypoint, cache_info={'start': old_waypoint, 'start_ori': old_initial_orientation, 'cached_actions': cached_temp_path})
+            #                     cached_this_iter = True
 
-                    old_waypoint = waypoint
-                    old_initial_orientation = round(curr_yaw) # guaranteed to be one of 0, 30, 60, ..., 330 degrees
-                    cached_temp_path = []
+            #         old_waypoint = waypoint
+            #         old_initial_orientation = round(curr_yaw) # guaranteed to be one of 0, 30, 60, ..., 330 degrees
+            #         cached_temp_path = []
                     
-                    # see if we can get on a cached path to the goal
-                    if (not cached_path_in_progress):
-                        cached_waypoints_to_visit = try_get_cached_path(waypoint, goal_waypoint, curr_sg)
-                        if (cached_waypoints_to_visit): # FULL cached path exists
-                            cached_action_list_to_follow = curr_sg[cached_waypoints_to_visit[0]][cached_waypoints_to_visit[1]]['cache_info']['cached_actions']
-                            if (curr_sg[cached_waypoints_to_visit[0]][cached_waypoints_to_visit[1]]['cache_info']['start'] == waypoint):
-                                cached_subpath_list_reverse = False
-                                current_subpath_action_index = 0
-                                desired_subpath_init_ori = curr_sg[cached_waypoints_to_visit[0]][cached_waypoints_to_visit[1]]['cache_info']['start_ori']
-                            else:
-                                cached_subpath_list_reverse = True
-                                current_subpath_action_index = len(cached_action_list_to_follow) - 1
-                                desired_subpath_init_ori = 180 - curr_sg[cached_waypoints_to_visit[0]][cached_waypoints_to_visit[1]]['cache_info']['start_ori']
-                                if (desired_subpath_init_ori < 0):
-                                    desired_subpath_init_ori += 360
+            #         # see if we can get on a cached path to the goal
+            #         if (not cached_path_in_progress):
+            #             cached_waypoints_to_visit = try_get_cached_path(waypoint, goal_waypoint, curr_sg)
+            #             if (cached_waypoints_to_visit): # FULL cached path exists
+            #                 cached_action_list_to_follow = curr_sg[cached_waypoints_to_visit[0]][cached_waypoints_to_visit[1]]['cache_info']['cached_actions']
+            #                 if (curr_sg[cached_waypoints_to_visit[0]][cached_waypoints_to_visit[1]]['cache_info']['start'] == waypoint):
+            #                     cached_subpath_list_reverse = False
+            #                     current_subpath_action_index = 0
+            #                     desired_subpath_init_ori = curr_sg[cached_waypoints_to_visit[0]][cached_waypoints_to_visit[1]]['cache_info']['start_ori']
+            #                 else:
+            #                     cached_subpath_list_reverse = True
+            #                     current_subpath_action_index = len(cached_action_list_to_follow) - 1
+            #                     desired_subpath_init_ori = 180 - curr_sg[cached_waypoints_to_visit[0]][cached_waypoints_to_visit[1]]['cache_info']['start_ori']
+            #                     if (desired_subpath_init_ori < 0):
+            #                         desired_subpath_init_ori += 360
 
-                            cwtv_index = 1
-                            current_subpath_in_progress = True
-                            cached_path_in_progress = True
-                            desired_ori_turning_required = True
-                        else:
-                            next_waypoint = find_best_cached_jump(curr_sg, waypoint, goal_waypoint)
-                            if (next_waypoint):
-                                cached_waypoints_to_visit = [] # empty list, we don't need it, will set it to this though so code
-                                # that checks against it works properly
-                                cwtv_index = 1 # placeholder value same as above
-                                cached_action_list_to_follow = curr_sg[waypoint][next_waypoint]['cache_info']['cached_actions']
-                                if (curr_sg[waypoint][next_waypoint]['cache_info']['start'] == waypoint):
-                                    cached_subpath_list_reverse = False
-                                    current_subpath_action_index = 0
-                                    desired_subpath_init_ori = curr_sg[waypoint][next_waypoint]['cache_info']['start_ori']
-                                else:
-                                    cached_subpath_list_reverse = True
-                                    current_subpath_action_index = len(cached_action_list_to_follow) - 1
-                                    desired_subpath_init_ori = 180 - curr_sg[waypoint][next_waypoint]['cache_info']['start_ori']
-                                    if (desired_subpath_init_ori < 0):
-                                        desired_subpath_init_ori += 360
+            #                 cwtv_index = 1
+            #                 current_subpath_in_progress = True
+            #                 cached_path_in_progress = True
+            #                 desired_ori_turning_required = True
+            #             else:
+            #                 next_waypoint = find_best_cached_jump(curr_sg, waypoint, goal_waypoint)
+            #                 if (next_waypoint):
+            #                     cached_waypoints_to_visit = [] # empty list, we don't need it, will set it to this though so code
+            #                     # that checks against it works properly
+            #                     cwtv_index = 1 # placeholder value same as above
+            #                     cached_action_list_to_follow = curr_sg[waypoint][next_waypoint]['cache_info']['cached_actions']
+            #                     if (curr_sg[waypoint][next_waypoint]['cache_info']['start'] == waypoint):
+            #                         cached_subpath_list_reverse = False
+            #                         current_subpath_action_index = 0
+            #                         desired_subpath_init_ori = curr_sg[waypoint][next_waypoint]['cache_info']['start_ori']
+            #                     else:
+            #                         cached_subpath_list_reverse = True
+            #                         current_subpath_action_index = len(cached_action_list_to_follow) - 1
+            #                         desired_subpath_init_ori = 180 - curr_sg[waypoint][next_waypoint]['cache_info']['start_ori']
+            #                         if (desired_subpath_init_ori < 0):
+            #                             desired_subpath_init_ori += 360
                                 
-                                current_subpath_in_progress = True
-                                cached_path_in_progress = True
-                                desired_ori_turning_required = True
+            #                     current_subpath_in_progress = True
+            #                     cached_path_in_progress = True
+            #                     desired_ori_turning_required = True
                 
-                if (cached_path_in_progress):
-                    if (not current_subpath_in_progress):
-                        cwtv_index += 1
-                        if (cwtv_index >= len(cached_waypoints_to_visit)):
-                            cached_path_in_progress = False # destination reached
-                        else:
-                            cached_action_list_to_follow = curr_sg[cached_waypoints_to_visit[cwtv_index - 1]][cached_waypoints_to_visit[cwtv_index]]['cache_info']['cached_actions']
-                            if (curr_sg[cached_waypoints_to_visit[cwtv_index - 1]][cached_waypoints_to_visit[cwtv_index]]['cache_info']['start'] == waypoint):
-                                cached_subpath_list_reverse = False
-                                current_subpath_action_index = 0
-                                desired_subpath_init_ori = curr_sg[cached_waypoints_to_visit[cwtv_index - 1]][cached_waypoints_to_visit[cwtv_index]]['cache_info']['start_ori']
-                            else:
-                                cached_subpath_list_reverse = True
-                                current_subpath_action_index = len(cached_action_list_to_follow) - 1
-                                desired_subpath_init_ori = 180 - curr_sg[cached_waypoints_to_visit[cwtv_index - 1]][cached_waypoints_to_visit[cwtv_index]]['cache_info']['start_ori']
-                                if (desired_subpath_init_ori < 0):
-                                    desired_subpath_init_ori += 360
+            #     if (cached_path_in_progress):
+            #         if (not current_subpath_in_progress):
+            #             cwtv_index += 1
+            #             if (cwtv_index >= len(cached_waypoints_to_visit)):
+            #                 cached_path_in_progress = False # destination reached
+            #             else:
+            #                 cached_action_list_to_follow = curr_sg[cached_waypoints_to_visit[cwtv_index - 1]][cached_waypoints_to_visit[cwtv_index]]['cache_info']['cached_actions']
+            #                 if (curr_sg[cached_waypoints_to_visit[cwtv_index - 1]][cached_waypoints_to_visit[cwtv_index]]['cache_info']['start'] == waypoint):
+            #                     cached_subpath_list_reverse = False
+            #                     current_subpath_action_index = 0
+            #                     desired_subpath_init_ori = curr_sg[cached_waypoints_to_visit[cwtv_index - 1]][cached_waypoints_to_visit[cwtv_index]]['cache_info']['start_ori']
+            #                 else:
+            #                     cached_subpath_list_reverse = True
+            #                     current_subpath_action_index = len(cached_action_list_to_follow) - 1
+            #                     desired_subpath_init_ori = 180 - curr_sg[cached_waypoints_to_visit[cwtv_index - 1]][cached_waypoints_to_visit[cwtv_index]]['cache_info']['start_ori']
+            #                     if (desired_subpath_init_ori < 0):
+            #                         desired_subpath_init_ori += 360
                             
-                            current_subpath_in_progress = True
-                            desired_ori_turning_required = True
+            #                 current_subpath_in_progress = True
+            #                 desired_ori_turning_required = True
 
-                    if (not cached_path_in_progress): break
+            #         if (not cached_path_in_progress): break
 
-                    if (desired_ori_turning_required):
-                        while (round(curr_yaw) > desired_subpath_init_ori):
-                            desired_subpath_init_ori += 360
-                        if (round(curr_yaw) == desired_subpath_init_ori):
-                            desired_ori_turning_required = False
-                        elif (desired_subpath_init_ori - round(curr_yaw) < 180):
-                            # turn left
-                            action = agent.act(obs, info, env.current_episode.episode_id, env, use_cached_action=True, cached_action=2)
-                            continuse_rotation_count -= 1 # we are rotating a lot but we have a reason. avoid program flagging us
-                        else: # the subtraction will be > 180 so turn right
-                            action = agent.act(obs, info, env.current_episode.episode_id, env, use_cached_action=True, cached_action=3)
-                            continuse_rotation_count -= 1
+            #         if (desired_ori_turning_required):
+            #             while (round(curr_yaw) > desired_subpath_init_ori):
+            #                 desired_subpath_init_ori += 360
+            #             if (round(curr_yaw) == desired_subpath_init_ori):
+            #                 desired_ori_turning_required = False
+            #             elif (desired_subpath_init_ori - round(curr_yaw) < 180):
+            #                 # turn left
+            #                 action = agent.act(obs, info, env.current_episode.episode_id, env, use_cached_action=True, cached_action=2)
+            #                 continuse_rotation_count -= 1 # we are rotating a lot but we have a reason. avoid program flagging us
+            #             else: # the subtraction will be > 180 so turn right
+            #                 action = agent.act(obs, info, env.current_episode.episode_id, env, use_cached_action=True, cached_action=3)
+            #                 continuse_rotation_count -= 1
 
-                    if (not desired_ori_turning_required):
-                        if (cached_subpath_list_reverse):
-                            cached_action_temp = cached_action_list_to_follow[current_subpath_action_index]
-                            if (type(cached_action_temp) == dict):
-                                cached_action_temp = cached_action_temp['action']
-                            if (cached_action_temp == 2):
-                                cached_action_temp = 3
-                            elif (cached_action_temp == 3):
-                                cached_action_temp = 2
-                            action = agent.act(obs, info, env.current_episode.episode_id, env, use_cached_action=True, cached_action=cached_action_temp)
-                            current_subpath_action_index -= 1
-                            if (current_subpath_action_index < 0):
-                                current_subpath_in_progress = False
-                        else:
-                            action = agent.act(obs, info, env.current_episode.episode_id, env, use_cached_action=True, cached_action=cached_action_list_to_follow[current_subpath_action_index])
-                            current_subpath_action_index += 1
-                            if (current_subpath_action_index >= len(cached_action_list_to_follow)):
-                                current_subpath_in_progress = False
+            #         if (not desired_ori_turning_required):
+            #             if (cached_subpath_list_reverse):
+            #                 cached_action_temp = cached_action_list_to_follow[current_subpath_action_index]
+            #                 if (type(cached_action_temp) == dict):
+            #                     cached_action_temp = cached_action_temp['action']
+            #                 if (cached_action_temp == 2):
+            #                     cached_action_temp = 3
+            #                 elif (cached_action_temp == 3):
+            #                     cached_action_temp = 2
+            #                 action = agent.act(obs, info, env.current_episode.episode_id, env, use_cached_action=True, cached_action=cached_action_temp)
+            #                 current_subpath_action_index -= 1
+            #                 if (current_subpath_action_index < 0):
+            #                     current_subpath_in_progress = False
+            #             else:
+            #                 action = agent.act(obs, info, env.current_episode.episode_id, env, use_cached_action=True, cached_action=cached_action_list_to_follow[current_subpath_action_index])
+            #                 current_subpath_action_index += 1
+            #                 if (current_subpath_action_index >= len(cached_action_list_to_follow)):
+            #                     current_subpath_in_progress = False
             
             if ((not enable_use_of_cache) or (not cached_path_in_progress)): # pure VLM navigation
                 action = agent.act(obs, info, env.current_episode.episode_id, env)
@@ -354,19 +375,19 @@ def evaluate_agent(config, split_id, dataset, result_path) -> None:
             
             # FOR LOGGING
             #cached_locations_LOG.append(info['top_down_map_vlnce']['agent_map_coord']) # 2D MAP COORDS
-            cached_locations_LOG.append(env.sim.get_agent_state().position.tolist()) # 3D HABITAT COORDS
-            cached_actions_LOG.append(action['action'])
-            who_acted_LOG.append(who_acted)
-            did_cache_action_LOG.append(cached_this_iter)
+            # cached_locations_LOG.append(env.sim.get_agent_state().position.tolist()) # 3D HABITAT COORDS
+            # cached_actions_LOG.append(action['action'])
+            # who_acted_LOG.append(who_acted)
+            # did_cache_action_LOG.append(cached_this_iter)
 
-            if (cached_this_iter):
-                print(f"[{episode_id} LOG] Added cached path to (local) scene graph")
-            if (cached_path_in_progress):
-                print(f"[{episode_id} LOG] Executing cache path...")
+            # if (cached_this_iter):
+            #     print(f"[{episode_id} LOG] Added cached path to (local) scene graph")
+            # if (cached_path_in_progress):
+            #     print(f"[{episode_id} LOG] Executing cache path...")
 
-        end_time = time.perf_counter()
-        execution_time = end_time - start_time
-        time_per_iter.append(execution_time)
+        # end_time = time.perf_counter()
+        # execution_time = end_time - start_time
+        # time_per_iter.append(execution_time)
 
         info = env.get_metrics()
         result_dict = dict()
@@ -383,48 +404,48 @@ def evaluate_agent(config, split_id, dataset, result_path) -> None:
         ) as f:
             json.dump(result_dict, f, indent=4)
 
-        # consider to be goal waypoint if success
-        if (enable_adding_to_cache):
-            if (result_dict["success"]):
-                cached_this_iter = False
-                if (old_waypoint):
-                    if curr_sg.has_edge(old_waypoint, goal_waypoint):
-                        try:
-                            if (len(curr_sg[old_waypoint][goal_waypoint]['cache_info']['cached_actions']) > cached_temp_path):
-                                # we have found a shorter path than our current cached path so we will replace it
-                                curr_sg[old_waypoint][goal_waypoint]['cache_info'] = {'start': old_waypoint, 'start_ori': old_initial_orientation, 'cached_actions': cached_temp_path}
-                                cached_this_iter = True
-                        except: # no cache info currently
-                            curr_sg[old_waypoint][goal_waypoint]['cache_info'] = {'start': old_waypoint, 'start_ori': old_initial_orientation, 'cached_actions': cached_temp_path}
-                            cached_this_iter = True
-                    else:
-                        curr_sg.add_edge(old_waypoint, goal_waypoint, cache_info={'start': old_waypoint, 'start_ori': old_initial_orientation, 'cached_actions': cached_temp_path})
-                        cached_this_iter = True
+        # # consider to be goal waypoint if success
+        # if (enable_adding_to_cache):
+        #     if (result_dict["success"]):
+        #         cached_this_iter = False
+        #         if (old_waypoint):
+        #             if curr_sg.has_edge(old_waypoint, goal_waypoint):
+        #                 try:
+        #                     if (len(curr_sg[old_waypoint][goal_waypoint]['cache_info']['cached_actions']) > cached_temp_path):
+        #                         # we have found a shorter path than our current cached path so we will replace it
+        #                         curr_sg[old_waypoint][goal_waypoint]['cache_info'] = {'start': old_waypoint, 'start_ori': old_initial_orientation, 'cached_actions': cached_temp_path}
+        #                         cached_this_iter = True
+        #                 except: # no cache info currently
+        #                     curr_sg[old_waypoint][goal_waypoint]['cache_info'] = {'start': old_waypoint, 'start_ori': old_initial_orientation, 'cached_actions': cached_temp_path}
+        #                     cached_this_iter = True
+        #             else:
+        #                 curr_sg.add_edge(old_waypoint, goal_waypoint, cache_info={'start': old_waypoint, 'start_ori': old_initial_orientation, 'cached_actions': cached_temp_path})
+        #                 cached_this_iter = True
 
-                scene_graphs[scene_id] = curr_sg
+        #         scene_graphs[scene_id] = curr_sg
 
-                print(f"[{episode_id} LOG] Successful outcome. Writing cached paths to file")
+        #         print(f"[{episode_id} LOG] Successful outcome. Writing cached paths to file")
 
-                with open(SCENE_GRAPHS_PATH, 'wb') as f:
-                    pickle.dump(scene_graphs, f)
+        #         with open(SCENE_GRAPHS_PATH, 'wb') as f:
+        #             pickle.dump(scene_graphs, f)
 
-        cache_dict = {
-            "scene_id": scene_id,
-            "success": result_dict["success"],
-            "avg_time_per_iter": statistics.mean(time_per_iter),
-            "num_vlm_calls": who_acted_LOG.count("vlm"),
-            "avg_price_per_vlm_call": statistics.mean(agent.total_costs_of_calls),
-            "num_total_calls": len(who_acted_LOG),
-            "goal_waypoint": goal_waypoint,
-            "cached_actions_LOG": cached_actions_LOG,
-            "who_acted_LOG": who_acted_LOG,
-            "did_cache_action_LOG": did_cache_action_LOG,
-            "cached_locations_LOG": cached_locations_LOG,
-            "vlm_price_LOG": agent.total_costs_of_calls,
-        }
+        # cache_dict = {
+        #     "scene_id": scene_id,
+        #     "success": result_dict["success"],
+        #     "avg_time_per_iter": statistics.mean(time_per_iter),
+        #     "num_vlm_calls": who_acted_LOG.count("vlm"),
+        #     "avg_price_per_vlm_call": statistics.mean(agent.total_costs_of_calls),
+        #     "num_total_calls": len(who_acted_LOG),
+        #     "goal_waypoint": goal_waypoint,
+        #     "cached_actions_LOG": cached_actions_LOG,
+        #     "who_acted_LOG": who_acted_LOG,
+        #     "did_cache_action_LOG": did_cache_action_LOG,
+        #     "cached_locations_LOG": cached_locations_LOG,
+        #     "vlm_price_LOG": agent.total_costs_of_calls,
+        # }
 
-        with open(os.path.join(os.path.join(result_path, "cache_log"),"stats_{}.json".format(env.current_episode.episode_id)), "w") as f:
-            json.dump(cache_dict, f, indent=4)
+        # with open(os.path.join(os.path.join(result_path, "cache_log"),"stats_{}.json".format(env.current_episode.episode_id)), "w") as f:
+        #     json.dump(cache_dict, f, indent=4)
 
         if (result_dict["success"]):
             print(f"[{episode_id} LOG] {scene_id}/{episode_id} complete, SUCCESS")
@@ -818,7 +839,7 @@ class MyGPTAgent(Agent):
             # map_img_str = self.get_topdown_map_base64(info, rgb.shape)
             user_text = (
                 f"Navigate to approach the red square on the top down map using the top-down map and camera view.\n\n"
-                f"TASK INSTRUCTION: Navigate until the agent's arrow is on top of the red square on the top down map.\n\n"
+                f"TASK INSTRUCTION:\n{instruction}\n\n"
                 f"AGENT ORIENTATION:\n"
                 f"- Current cardinal direction: {current_direction}\n"
                 f"- Yaw angle: {current_yaw:.1f}°\n\n"
@@ -872,9 +893,9 @@ class MyGPTAgent(Agent):
                         "- Every step, make a micro-plan: identify goal direction, check navigability, choose turn/move.\n"
                         "- If goal is to your left/right on the map, rotate toward it before moving.\n"
                         "- Use global cardinal directions for reasoning, NOT relative left/right from the camera.\n\n"
-                        # "=== INSTRUCTION HANDLING PRINCIPLES ==="
-                        # "- Align map reasoning with the goal (if the instruction says 'enter the room on the left,' prioritize detecting a doorway on the left side of the map/camera).\n"
-                        # "- If the map doesn’t directly show the described feature (e.g., 'hallway'), rely on camera view and relative navigation until a landmark matches.\n"
+                        "=== INSTRUCTION HANDLING PRINCIPLES ==="
+                        "- Align map reasoning with the goal (if the instruction says 'enter the room on the left,' prioritize detecting a doorway on the left side of the map/camera).\n"
+                        "- If the map doesn’t directly show the described feature (e.g., 'hallway'), rely on camera view and relative navigation until a landmark matches.\n"
                         "=== HISTORY INTERPRETATION RULES ==="
                         "- If Collision=True, treat it as a collision (forward failed) → reroute using a different action.\n"
                         "- If the last few actions are all turns (2 or 3) and orientation is nearly unchanged, you are looping → choose a different strategy (try forward or opposite turn).\n"
@@ -919,7 +940,7 @@ class MyGPTAgent(Agent):
                     print(response)
 
                     generated_text = response.choices[0].message.content.strip()
-                    self.total_costs_of_calls.append(openai_api_calculate_cost(response.usage))
+                    # self.total_costs_of_calls.append(openai_api_calculate_cost(response.usage))
                     self.previous_plan = self.parse_next_step(generated_text)
                     self.previous_output = generated_text
                     action_index = self.parse_action_number(generated_text)
