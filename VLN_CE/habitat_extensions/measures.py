@@ -315,6 +315,74 @@ class SDTW(Measure):
 
 
 @registry.register_measure
+class BranchSelectionAccuracy(Measure):
+    """Branch Selection Accuracy (BSA).
+    Measures whether the agent navigates to the correct branch subgoal(s)
+    specified in the episode, independent of final goal success.
+    Value is the fraction of subgoals reached within success_distance at any
+    point during navigation. Range [0, 1]; 0 if the episode has no subgoals.
+    """
+
+    cls_uuid: str = "branch_selection_accuracy"
+
+    def __init__(
+        self, *args: Any, sim: Simulator, config: Config, **kwargs: Any
+    ) -> None:
+        self._sim = sim
+        self._success_distance = config.SUCCESS_DISTANCE
+        super().__init__()
+
+    def _get_uuid(self, *args: Any, **kwargs: Any) -> str:
+        return self.cls_uuid
+
+    def reset_metric(self, *args: Any, episode, **kwargs: Any) -> None:
+        self._subgoal_positions = []
+        if getattr(episode, "subgoals", None) is not None:
+            self._subgoal_positions = [sg.position for sg in episode.subgoals]
+        self._reached = [False] * len(self._subgoal_positions)
+        self._metric = 0.0
+        self.update_metric(episode=episode)
+
+    def update_metric(self, *args: Any, **kwargs: Any) -> None:
+        if not self._subgoal_positions:
+            return
+        agent_pos = self._sim.get_agent_state().position
+        for i, sg_pos in enumerate(self._subgoal_positions):
+            if not self._reached[i]:
+                if euclidean_distance(agent_pos, sg_pos) <= self._success_distance:
+                    self._reached[i] = True
+        self._metric = sum(self._reached) / len(self._reached)
+
+
+@registry.register_measure
+class ConditionalSuccessRate(Measure):
+    """Conditional Success Rate (CSR).
+    CSR = 1.0 iff the agent reaches every subgoal (BSA == 1.0) AND the final
+    goal (Success == 1.0), otherwise 0.0.
+    """
+
+    cls_uuid: str = "conditional_success_rate"
+
+    def _get_uuid(self, *args: Any, **kwargs: Any) -> str:
+        return self.cls_uuid
+
+    def reset_metric(self, *args: Any, task: EmbodiedTask, **kwargs: Any) -> None:
+        task.measurements.check_measure_dependencies(
+            self.uuid,
+            [BranchSelectionAccuracy.cls_uuid, Success.cls_uuid],
+        )
+        self._metric = 0.0
+        self.update_metric(task=task)
+
+    def update_metric(self, *args: Any, task: EmbodiedTask, **kwargs: Any) -> None:
+        bsa = task.measurements.measures[
+            BranchSelectionAccuracy.cls_uuid
+        ].get_metric()
+        success = task.measurements.measures[Success.cls_uuid].get_metric()
+        self._metric = float(bsa == 1.0 and bool(success))
+
+
+@registry.register_measure
 class TopDownMapVLNCE(Measure):
     """A top down map that optionally shows VLN-related visual information
     such as MP3D node locations and MP3D agent traversals.

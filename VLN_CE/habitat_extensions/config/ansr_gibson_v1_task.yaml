@@ -50,15 +50,19 @@ TASK:
     PATH_LENGTH,
     ORACLE_SUCCESS,
     STEPS_TAKEN,
-    COLLISIONS
+    COLLISIONS,
+    BRANCH_SELECTION_ACCURACY,
+    CONDITIONAL_SUCCESS_RATE
   ]
   SUCCESS:
     SUCCESS_DISTANCE: 1.0
   SPL:
     SUCCESS_DISTANCE: 1.0
+  BRANCH_SELECTION_ACCURACY:
+    SUCCESS_DISTANCE: 1.0
 
 DATASET:
-  TYPE: VLN-CE-v1
+  TYPE: ANSR-v1
   SPLIT: all
   DATA_PATH: VLN_CE/data/datasets/ANSR_V1/{split}/{split}.json.gz
   # Joined with episode scene_id ``gibson/<Scene>/<Scene>.glb`` → full path under scene_datasets.

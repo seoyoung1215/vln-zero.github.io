@@ -51,7 +51,8 @@ python -m pip install "python-dotenv>=1.0.0"
 
 
 echo "Installing conda dependency (python-lmdb)..."
-conda_install -c conda-forge python-lmdb
+conda_install "$HABITAT_SIM_TARBALL"
+# mamba install -y -c aihabitat "habitat-sim=0.3.3=py3.9_headless_linux_*"
 
 
 echo "Setup complete."

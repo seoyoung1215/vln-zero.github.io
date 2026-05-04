@@ -230,3 +230,43 @@ class RxRVLNCEDatasetV1(Dataset):
     @staticmethod
     def _language_from_episode(episode: VLNExtendedEpisode) -> str:
         return episode.instruction.language
+
+
+@attr.s(auto_attribs=True, kw_only=True)
+class ANSREpisode(VLNExtendedEpisode):
+    subgoals: Optional[List[NavigationGoal]] = attr.ib(default=None)
+
+
+@registry.register_dataset(name="ANSR-v1")
+class ANSRDatasetV1(VLNCEDatasetV1):
+    """Loads the ANSR VLN-CE dataset, which extends VLN-CE-v1 with subgoals."""
+
+    def from_json(
+        self, json_str: str, scenes_dir: Optional[str] = None
+    ) -> None:
+        deserialized = json.loads(json_str)
+        self.instruction_vocab = VocabDict(
+            word_list=deserialized["instruction_vocab"]["word_list"]
+        )
+
+        for episode in deserialized["episodes"]:
+            episode["episode_id"] = str(episode["episode_id"])
+            episode["trajectory_id"] = str(episode["trajectory_id"])
+
+            episode = ANSREpisode(**episode)
+
+            if scenes_dir is not None:
+                if episode.scene_id.startswith(DEFAULT_SCENE_PATH_PREFIX):
+                    episode.scene_id = episode.scene_id[
+                        len(DEFAULT_SCENE_PATH_PREFIX) :
+                    ]
+                episode.scene_id = os.path.join(scenes_dir, episode.scene_id)
+
+            episode.instruction = InstructionData(**episode.instruction)
+            if episode.goals is not None:
+                for g_index, goal in enumerate(episode.goals):
+                    episode.goals[g_index] = NavigationGoal(**goal)
+            if episode.subgoals is not None:
+                for s_index, subgoal in enumerate(episode.subgoals):
+                    episode.subgoals[s_index] = NavigationGoal(**subgoal)
+            self.episodes.append(episode)

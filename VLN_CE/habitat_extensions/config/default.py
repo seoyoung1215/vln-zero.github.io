@@ -100,6 +100,17 @@ _C.TASK.ORACLE_SPL.TYPE = "OracleSPL"
 _C.TASK.STEPS_TAKEN = CN()
 _C.TASK.STEPS_TAKEN.TYPE = "StepsTaken"
 # ----------------------------------------------------------------------------
+# BRANCH_SELECTION_ACCURACY MEASUREMENT
+# ----------------------------------------------------------------------------
+_C.TASK.BRANCH_SELECTION_ACCURACY = CN()
+_C.TASK.BRANCH_SELECTION_ACCURACY.TYPE = "BranchSelectionAccuracy"
+_C.TASK.BRANCH_SELECTION_ACCURACY.SUCCESS_DISTANCE = 1.0
+# ----------------------------------------------------------------------------
+# CONDITIONAL_SUCCESS_RATE MEASUREMENT
+# ----------------------------------------------------------------------------
+_C.TASK.CONDITIONAL_SUCCESS_RATE = CN()
+_C.TASK.CONDITIONAL_SUCCESS_RATE.TYPE = "ConditionalSuccessRate"
+# ----------------------------------------------------------------------------
 # TOP_DOWN_MAP_VLNCE MEASUREMENT
 # ----------------------------------------------------------------------------
 _C.TASK.TOP_DOWN_MAP_VLNCE = CN()
@@ -112,7 +123,7 @@ _C.TASK.TOP_DOWN_MAP_VLNCE.DRAW_SHORTEST_PATH = True
 _C.TASK.TOP_DOWN_MAP_VLNCE.DRAW_REFERENCE_PATH = True
 _C.TASK.TOP_DOWN_MAP_VLNCE.DRAW_FIXED_WAYPOINTS = True
 _C.TASK.TOP_DOWN_MAP_VLNCE.DRAW_MP3D_AGENT_PATH = True
-_C.TASK.TOP_DOWN_MAP_VLNCE.GRAPHS_FILE = "VLN_CE/data/connectivity_graphs.pkl" # "data/connectivity_graphs.pkl"
+_C.TASK.TOP_DOWN_MAP_VLNCE.GRAPHS_FILE = "VLN_CE/data/connectivity_graphs.pkl"
 _C.TASK.TOP_DOWN_MAP_VLNCE.FOG_OF_WAR = CN()
 _C.TASK.TOP_DOWN_MAP_VLNCE.FOG_OF_WAR.DRAW = True
 _C.TASK.TOP_DOWN_MAP_VLNCE.FOG_OF_WAR.FOV = 90
@@ -135,9 +146,6 @@ _C.DATASET.ROLES = ["guide"]  # options: "guide", "follower"
 _C.DATASET.LANGUAGES = ["*"]
 # a list of episode IDs to allow in dataset creation.
 _C.DATASET.EPISODES_ALLOWED = ["*"]
-# If set (non-empty), SplitNavmeshEnv loads ``<NAVMESH_DIR>/<scene_basename>.navmesh``
-# after each scene load; .glb paths still use SCENES_DIR. Empty string: default Habitat behavior.
-_C.DATASET.NAVMESH_DIR = ""
 
 
 def get_extended_config(
